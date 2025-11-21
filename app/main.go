@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 )
@@ -52,7 +53,7 @@ func evaluate(input string) {
 
 	fn, ok := COMMANDS[cmd]
 	if !ok {
-		fmt.Fprintf(os.Stdout, "%s: command not found\n", cmd)
+		external(cmd, options)
 		return
 	}
 
@@ -91,4 +92,34 @@ func typeFn(options []string) {
 	}
 	fmt.Fprintf(os.Stdout, "%s is %s\n", cmd, absPath)
 	return
+}
+
+func external(cmd string, options []string) {
+	absPath, err := findFileInPath(cmd)
+	if err != nil {
+		fmt.Printf("fail to findFileInPath: %v\n", err)
+		return
+	}
+	if len(absPath) == 0 {
+		fmt.Fprintf(os.Stdout, "%s: command not found\n", cmd)
+		return
+	}
+	//go func() {
+	//	defer func() {
+	//		if e := recover(); e != nil {
+	//			fmt.Fprintf(os.Stderr, "panic: %v\n", e)
+	//		}
+	//	}()
+	//
+	//
+	//}()
+
+	c := exec.Command(absPath, options...)
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	err = c.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "fail to exec %s: %v\n", absPath, err)
+		return
+	}
 }
