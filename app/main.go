@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -24,15 +25,13 @@ func main() {
 			os.Exit(1)
 		}
 
-		input = strings.Trim(input, "\n\r ")
-
 		evaluate(input)
 	}
 }
 
 var (
 	once sync.Once
-	// set once, read only
+	// COMMANDS set once, read only
 	COMMANDS = make(map[string]func(options []string))
 )
 
@@ -47,7 +46,9 @@ func initCommands() {
 }
 
 func evaluate(input string) {
-	args := strings.Split(input, " ")
+	input = strings.Trim(input, "\n\r ")
+
+	args := parseCommands(input)
 
 	cmd, options := args[0], args[1:]
 
@@ -58,6 +59,37 @@ func evaluate(input string) {
 	}
 
 	fn(options)
+}
+
+func parseCommands(input string) []string {
+	var (
+		isSingleQuote bool
+		sb            strings.Builder
+		res           []string
+	)
+
+	for _, c := range input {
+		switch c {
+		case '\'':
+			isSingleQuote = !isSingleQuote
+		case ' ':
+			if isSingleQuote {
+				// 单引号内的空格保留
+				sb.WriteRune(c)
+			} else if sb.Len() > 0 {
+				// 单引号外的空格,如果sb有字符,则作为分隔符
+				res = append(res, sb.String())
+				sb.Reset()
+			}
+		default:
+			sb.WriteRune(c)
+		}
+	}
+
+	if sb.Len() > 0 {
+		res = append(res, sb.String())
+	}
+	return res
 }
 
 func exit(options []string) {
@@ -83,13 +115,14 @@ func typeFn(options []string) {
 
 	absPath, err := exec.LookPath(cmd)
 	if err != nil {
-		fmt.Printf("fail to findFileInPath: %v\n", err)
+		if errors.Is(err, exec.ErrNotFound) {
+			fmt.Fprintf(os.Stdout, "%s: not found\n", cmd)
+			return
+		}
+		fmt.Printf("fail to LookPath: %v\n", err)
 		return
 	}
-	if len(absPath) == 0 {
-		fmt.Fprintf(os.Stdout, "%s: not found\n", cmd)
-		return
-	}
+
 	fmt.Fprintf(os.Stdout, "%s is %s\n", cmd, absPath)
 	return
 }
@@ -97,15 +130,17 @@ func typeFn(options []string) {
 func external(cmd string, options []string) {
 	absPath, err := exec.LookPath(cmd)
 	if err != nil {
-		fmt.Printf("fail to findFileInPath: %v\n", err)
-		return
-	}
-	if len(absPath) == 0 {
-		fmt.Fprintf(os.Stdout, "%s: command not found\n", cmd)
+		if errors.Is(err, exec.ErrNotFound) {
+			fmt.Fprintf(os.Stdout, "%s: command not found\n", cmd)
+			return
+		}
+		fmt.Printf("fail to LookPath: %v\n", err)
 		return
 	}
 
 	c := exec.Command(absPath, options...)
+	// Set argv to use original command name as argv[0]
+	c.Args[0] = cmd
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	c.Stdin = os.Stdin
