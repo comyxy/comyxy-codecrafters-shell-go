@@ -11,17 +11,43 @@ const (
 	StateEscaped
 )
 
+type ParseStateStack struct {
+	stack []ParseState
+}
+
+func NewParseStateStack() *ParseStateStack {
+	return &ParseStateStack{stack: []ParseState{StateNormal}}
+}
+
+func (s *ParseStateStack) Push(state ParseState) {
+	s.stack = append(s.stack, state)
+}
+
+func (s *ParseStateStack) Pop() ParseState {
+	if len(s.stack) <= 1 {
+		// 保留初始状态normal
+		return StateNormal
+	}
+	top := s.stack[len(s.stack)-1]
+	s.stack = s.stack[:len(s.stack)-1]
+	return top
+}
+
+func (s *ParseStateStack) Peek() ParseState {
+	return s.stack[len(s.stack)-1]
+}
+
 type Parser struct {
-	state ParseState
-	res   []string
-	sb    strings.Builder
+	stateStack *ParseStateStack
+	res        []string
+	sb         strings.Builder
 }
 
 func NewParser() *Parser {
 	return &Parser{
-		state: StateNormal,
-		res:   nil,
-		sb:    strings.Builder{},
+		stateStack: NewParseStateStack(),
+		res:        nil,
+		sb:         strings.Builder{},
 	}
 }
 
@@ -38,7 +64,9 @@ func (p *Parser) Parse(input string) []string {
 }
 
 func (p *Parser) processRune(c rune) {
-	switch p.state {
+	currentState := p.stateStack.Peek()
+
+	switch currentState {
 	case StateNormal:
 		p.processStateNormal(c)
 	case StateSingleQuote:
@@ -54,12 +82,12 @@ func (p *Parser) processStateNormal(c rune) {
 	switch c {
 	case '\'':
 		// 单引号
-		p.state = StateSingleQuote
+		p.stateStack.Push(StateSingleQuote)
 	case '"':
 		// 双引号
-		p.state = StateDoubleQuote
+		p.stateStack.Push(StateDoubleQuote)
 	case '\\':
-		p.state = StateEscaped
+		p.stateStack.Push(StateEscaped)
 	case ' ':
 		p.finalizeArg()
 	default:
@@ -70,7 +98,7 @@ func (p *Parser) processStateNormal(c rune) {
 func (p *Parser) processStateSingleQuote(c rune) {
 	switch c {
 	case '\'':
-		p.state = StateNormal
+		p.stateStack.Pop()
 	default:
 		p.sb.WriteRune(c)
 	}
@@ -79,15 +107,32 @@ func (p *Parser) processStateSingleQuote(c rune) {
 func (p *Parser) processStateDoubleQuote(c rune) {
 	switch c {
 	case '"':
-		p.state = StateNormal
+		p.stateStack.Pop()
+	case '\\':
+		// 双引号支持部分字符转义
+		p.stateStack.Push(StateEscaped)
 	default:
 		p.sb.WriteRune(c)
 	}
 }
 
 func (p *Parser) processStateEscaped(c rune) {
-	p.sb.WriteRune(c)
-	p.state = StateNormal
+	p.stateStack.Pop()
+
+	prevState := p.stateStack.Peek()
+	switch prevState {
+	case StateDoubleQuote:
+		if c == '"' || c == '\\' {
+			p.sb.WriteRune(c)
+		} else {
+			p.sb.WriteRune('\\')
+			p.sb.WriteRune(c)
+		}
+	case StateNormal:
+		p.sb.WriteRune(c)
+	default:
+		panic("unreachable")
+	}
 }
 
 func (p *Parser) finalizeArg() {
