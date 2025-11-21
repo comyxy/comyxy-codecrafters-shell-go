@@ -97,7 +97,8 @@ func typeFn(options []string) {
 		// 遍历所有条目
 		for _, entry := range entries {
 			if entry.Name() == cmd {
-				fmt.Fprintf(os.Stdout, "%s is in %s\n", cmd, dir)
+				pos := strings.Join([]string{dir, cmd}, string(os.PathSeparator))
+				fmt.Fprintf(os.Stdout, "%s is in %s\n", cmd, pos)
 				return
 			}
 		}
