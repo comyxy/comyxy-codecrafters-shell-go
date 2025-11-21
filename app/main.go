@@ -105,7 +105,7 @@ func external(cmd string, options []string) {
 		return
 	}
 
-	c := exec.Command(absPath, options...)
+	c := exec.Command(cmd, options...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	c.Stdin = os.Stdin
