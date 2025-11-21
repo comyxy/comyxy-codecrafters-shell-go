@@ -104,19 +104,12 @@ func external(cmd string, options []string) {
 		fmt.Fprintf(os.Stdout, "%s: command not found\n", cmd)
 		return
 	}
-	//go func() {
-	//	defer func() {
-	//		if e := recover(); e != nil {
-	//			fmt.Fprintf(os.Stderr, "panic: %v\n", e)
-	//		}
-	//	}()
-	//
-	//
-	//}()
 
 	c := exec.Command(absPath, options...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
+	c.Stdin = os.Stdin
+
 	err = c.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "fail to exec %s: %v\n", absPath, err)
