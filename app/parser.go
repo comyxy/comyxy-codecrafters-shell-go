@@ -122,16 +122,23 @@ func (p *Parser) processStateEscaped(c rune) {
 	prevState := p.stateStack.Peek()
 	switch prevState {
 	case StateDoubleQuote:
-		if c == '"' || c == '\\' {
-			p.sb.WriteRune(c)
-		} else {
-			p.sb.WriteRune('\\')
-			p.sb.WriteRune(c)
-		}
+		p.handleDoubleQuoteEscape(c)
 	case StateNormal:
 		p.sb.WriteRune(c)
 	default:
 		panic("unreachable")
+	}
+}
+
+func (p *Parser) handleDoubleQuoteEscape(c rune) {
+	// 双引号内需要转义的字符列表
+	switch c {
+	case '"', '\\':
+		p.sb.WriteRune(c) // \" → ", \\ → \ 等
+	default:
+		// 非特殊字符：保留\和字符本身（如\x → \x）
+		p.sb.WriteRune('\\')
+		p.sb.WriteRune(c)
 	}
 }
 
