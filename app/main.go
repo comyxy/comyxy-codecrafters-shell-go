@@ -75,7 +75,7 @@ func typeFn(options []string) {
 
 	_, ok := COMMANDS[cmd]
 	if !ok {
-		fmt.Fprintf(os.Stdout, "%s: command not found\n", cmd)
+		fmt.Fprintf(os.Stdout, "%s: not found\n", cmd)
 	} else {
 		fmt.Fprintf(os.Stdout, "%s is a shell builtin\n", cmd)
 	}
