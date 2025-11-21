@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 	"sync"
@@ -74,9 +76,31 @@ func typeFn(options []string) {
 	cmd := options[0]
 
 	_, ok := COMMANDS[cmd]
-	if !ok {
-		fmt.Fprintf(os.Stdout, "%s: not found\n", cmd)
-	} else {
+	if ok {
 		fmt.Fprintf(os.Stdout, "%s is a shell builtin\n", cmd)
+		return
 	}
+
+	pathEnv := os.Getenv("PATH")
+	dirs := strings.Split(pathEnv, string(os.PathListSeparator))
+	for _, dir := range dirs {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			var pathErr *fs.PathError
+			if errors.As(err, &pathErr) {
+				continue
+			}
+			fmt.Printf("fail to read dir: %v\n", err)
+			return
+		}
+
+		// 遍历所有条目
+		for _, entry := range entries {
+			if entry.Name() == cmd {
+				fmt.Fprintf(os.Stdout, "%s is in %s\n", cmd, dir)
+				return
+			}
+		}
+	}
+	fmt.Fprintf(os.Stdout, "%s: not found\n", cmd)
 }
