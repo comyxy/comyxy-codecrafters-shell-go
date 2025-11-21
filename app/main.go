@@ -48,7 +48,7 @@ func initCommands() {
 func evaluate(input string) {
 	input = strings.Trim(input, "\n\r ")
 
-	args := parseCommands(input)
+	args := NewParser().Parse(input)
 
 	cmd, options := args[0], args[1:]
 
@@ -59,37 +59,6 @@ func evaluate(input string) {
 	}
 
 	fn(options)
-}
-
-func parseCommands(input string) []string {
-	var (
-		isSingleQuote bool
-		sb            strings.Builder
-		res           []string
-	)
-
-	for _, c := range input {
-		switch c {
-		case '\'':
-			isSingleQuote = !isSingleQuote
-		case ' ':
-			if isSingleQuote {
-				// 单引号内的空格保留
-				sb.WriteRune(c)
-			} else if sb.Len() > 0 {
-				// 单引号外的空格,如果sb有字符,则作为分隔符
-				res = append(res, sb.String())
-				sb.Reset()
-			}
-		default:
-			sb.WriteRune(c)
-		}
-	}
-
-	if sb.Len() > 0 {
-		res = append(res, sb.String())
-	}
-	return res
 }
 
 func exit(options []string) {
