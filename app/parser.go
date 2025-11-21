@@ -8,6 +8,7 @@ const (
 	StateNormal ParseState = iota
 	StateSingleQuote
 	StateDoubleQuote
+	StateEscaped
 )
 
 type Parser struct {
@@ -44,6 +45,8 @@ func (p *Parser) processRune(c rune) {
 		p.processStateSingleQuote(c)
 	case StateDoubleQuote:
 		p.processStateDoubleQuote(c)
+	case StateEscaped:
+		p.processStateEscaped(c)
 	}
 }
 
@@ -55,6 +58,8 @@ func (p *Parser) processStateNormal(c rune) {
 	case '"':
 		// 双引号
 		p.state = StateDoubleQuote
+	case '\\':
+		p.state = StateEscaped
 	case ' ':
 		p.finalizeArg()
 	default:
@@ -78,6 +83,11 @@ func (p *Parser) processStateDoubleQuote(c rune) {
 	default:
 		p.sb.WriteRune(c)
 	}
+}
+
+func (p *Parser) processStateEscaped(c rune) {
+	p.sb.WriteRune(c)
+	p.state = StateNormal
 }
 
 func (p *Parser) finalizeArg() {
