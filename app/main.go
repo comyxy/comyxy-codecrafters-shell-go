@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 )
 
 // // Ensures gofmt doesn't remove the "fmt" and "os" imports in stage 1 (feel free to remove this!)
 // var _ = fmt.Fprint
 // var _ = os.Stdout
 func main() {
+	initCommands()
 	for {
 		fmt.Fprint(os.Stdout, "$ ")
 
@@ -26,9 +28,20 @@ func main() {
 	}
 }
 
-var COMMANDS = map[string]func(options []string){
-	"exit": exit,
-	"echo": echo,
+var (
+	once sync.Once
+	// set once, read only
+	COMMANDS = make(map[string]func(options []string))
+)
+
+func initCommands() {
+	once.Do(func() {
+		COMMANDS = map[string]func(options []string){
+			"exit": exit,
+			"echo": echo,
+			"type": typeFn,
+		}
+	})
 }
 
 func evaluate(input string) {
@@ -50,9 +63,20 @@ func exit(options []string) {
 }
 
 func echo(options []string) {
-	if len(options) == 0 {
-
-	}
 	r := strings.Join(options, " ")
 	fmt.Fprintln(os.Stdout, r)
+}
+
+func typeFn(options []string) {
+	if len(options) == 0 {
+		return
+	}
+	cmd := options[0]
+
+	_, ok := COMMANDS[cmd]
+	if !ok {
+		fmt.Fprintf(os.Stdout, "%s: command not found\n", cmd)
+	} else {
+		fmt.Fprintf(os.Stdout, "%s is a shell builtin\n", cmd)
+	}
 }
