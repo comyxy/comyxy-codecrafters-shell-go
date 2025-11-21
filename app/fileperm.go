@@ -26,9 +26,16 @@ func findFileInPath(file string) (string, error) {
 
 		// 遍历所有条目
 		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
 			if entry.Name() == file {
 				absPath := filepath.Join(dir, file)
-				hasPerm, err := hasExecutePermission(absPath)
+				fileInfo, err := entry.Info()
+				if err != nil {
+					return "", err
+				}
+				hasPerm, err := hasExecutePermission(fileInfo)
 				if err != nil {
 					return "", err
 				}
@@ -41,21 +48,10 @@ func findFileInPath(file string) (string, error) {
 	return "", nil
 }
 
-func hasExecutePermission(filePath string) (bool, error) {
-	// Get file info
-	fileInfo, err := os.Stat(filePath)
-	if err != nil {
-		return false, fmt.Errorf("failed to stat file: %w", err)
-	}
-
-	// Directories are not executable files (Unix: execute = enter directory)
-	if fileInfo.IsDir() {
-		return false, fmt.Errorf("path is a directory, not a file")
-	}
-
+func hasExecutePermission(fileInfo os.FileInfo) (bool, error) {
 	switch runtime.GOOS {
 	case "windows":
-		return isWindowsExecutable(filePath)
+		return isWindowsExecutable(fileInfo)
 	case "linux", "darwin", "freebsd", "openbsd", "netbsd":
 		return isUnixExecutable(fileInfo)
 	default:
@@ -85,7 +81,7 @@ func isUnixExecutable(fileInfo os.FileInfo) (bool, error) {
 	return false, nil
 }
 
-func isWindowsExecutable(filePath string) (bool, error) {
+func isWindowsExecutable(fileInfo os.FileInfo) (bool, error) {
 	// Windows recognizes executable extensions
 	execExts := map[string]bool{
 		".exe": true,
@@ -95,7 +91,7 @@ func isWindowsExecutable(filePath string) (bool, error) {
 		".ps1": true,
 	}
 
-	ext := strings.ToLower(filepath.Ext(filePath))
+	ext := strings.ToLower(filepath.Ext(fileInfo.Name()))
 	if !execExts[ext] {
 		return false, nil
 	}
