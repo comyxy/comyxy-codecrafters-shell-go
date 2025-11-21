@@ -81,7 +81,7 @@ func typeFn(options []string) {
 		return
 	}
 
-	absPath, err := findFileInPath(cmd)
+	absPath, err := exec.LookPath(cmd)
 	if err != nil {
 		fmt.Printf("fail to findFileInPath: %v\n", err)
 		return
@@ -95,7 +95,7 @@ func typeFn(options []string) {
 }
 
 func external(cmd string, options []string) {
-	absPath, err := findFileInPath(cmd)
+	absPath, err := exec.LookPath(cmd)
 	if err != nil {
 		fmt.Printf("fail to findFileInPath: %v\n", err)
 		return
@@ -105,7 +105,7 @@ func external(cmd string, options []string) {
 		return
 	}
 
-	c := exec.Command(cmd, options...)
+	c := exec.Command(absPath, options...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	c.Stdin = os.Stdin
