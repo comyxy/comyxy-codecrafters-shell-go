@@ -2,9 +2,7 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"strings"
 	"sync"
@@ -15,6 +13,7 @@ import (
 // var _ = os.Stdout
 func main() {
 	initCommands()
+
 	for {
 		fmt.Fprint(os.Stdout, "$ ")
 
@@ -81,27 +80,15 @@ func typeFn(options []string) {
 		return
 	}
 
-	pathEnv := os.Getenv("PATH")
-	dirs := strings.Split(pathEnv, string(os.PathListSeparator))
-	for _, dir := range dirs {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			var pathErr *fs.PathError
-			if errors.As(err, &pathErr) {
-				continue
-			}
-			fmt.Printf("fail to read dir: %v\n", err)
-			return
-		}
-
-		// 遍历所有条目
-		for _, entry := range entries {
-			if entry.Name() == cmd {
-				pos := strings.Join([]string{dir, cmd}, string(os.PathSeparator))
-				fmt.Fprintf(os.Stdout, "%s is %s\n", cmd, pos)
-				return
-			}
-		}
+	absPath, err := findFileInPath(cmd)
+	if err != nil {
+		fmt.Printf("fail to findFileInPath: %v\n", err)
+		return
 	}
-	fmt.Fprintf(os.Stdout, "%s: not found\n", cmd)
+	if len(absPath) == 0 {
+		fmt.Fprintf(os.Stdout, "%s: not found\n", cmd)
+		return
+	}
+	fmt.Fprintf(os.Stdout, "%s is %s\n", cmd, absPath)
+	return
 }
