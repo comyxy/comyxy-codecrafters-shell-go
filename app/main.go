@@ -98,7 +98,7 @@ func typeFn(options []string) {
 		for _, entry := range entries {
 			if entry.Name() == cmd {
 				pos := strings.Join([]string{dir, cmd}, string(os.PathSeparator))
-				fmt.Fprintf(os.Stdout, "%s is in %s\n", cmd, pos)
+				fmt.Fprintf(os.Stdout, "%s is %s\n", cmd, pos)
 				return
 			}
 		}
