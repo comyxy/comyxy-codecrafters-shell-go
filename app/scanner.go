@@ -29,24 +29,40 @@ func (sc *Scanner) Scan() []Token {
 		case ' ':
 			sc.advance()
 		case '>': // redirect out
-			sc.advance()
-			res = append(res, NewToken(TokenRedirectOut, ""))
+			if sc.peek() == '>' {
+				res = append(res, NewToken(TokenRedirectOutAppend, ">>"))
+				sc.advance()
+				sc.advance()
+			} else {
+				res = append(res, NewToken(TokenRedirectOut, ">"))
+				sc.advance()
+			}
 		case '1': // redirect out
-			nextChar := sc.peek()
-			if nextChar == '>' {
-				res = append(res, NewToken(TokenRedirectOut, ""))
+			if sc.peek() == '>' {
 				sc.advance()
-				sc.advance()
+				if sc.peek() == '>' {
+					res = append(res, NewToken(TokenRedirectOutAppend, "1>>"))
+					sc.advance()
+					sc.advance()
+				} else {
+					res = append(res, NewToken(TokenRedirectOut, "1>"))
+					sc.advance()
+				}
 			} else {
 				word := sc.scanWord()
 				res = append(res, NewToken(TokenWord, word))
 			}
 		case '2': // redirect err
-			nextChar := sc.peek()
-			if nextChar == '>' {
-				res = append(res, NewToken(TokenRedirectErr, ""))
+			if sc.peek() == '>' {
 				sc.advance()
-				sc.advance()
+				if sc.peek() == '>' {
+					res = append(res, NewToken(TokenRedirectErrAppend, "2>>"))
+					sc.advance()
+					sc.advance()
+				} else {
+					res = append(res, NewToken(TokenRedirectErr, "2>"))
+					sc.advance()
+				}
 			} else {
 				word := sc.scanWord()
 				res = append(res, NewToken(TokenWord, word))

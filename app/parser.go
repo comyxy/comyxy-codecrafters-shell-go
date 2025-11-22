@@ -24,24 +24,26 @@ func (p *Parser) Parse() *Command {
 
 	for p.cur.Type != TokenEOF {
 
+		curType := p.cur.Type
+
 		switch p.cur.Type {
 		case TokenWord:
 			cmd.Args = append(cmd.Args, p.cur.Val)
 			p.advance()
-		case TokenRedirectOut:
+		case TokenRedirectOut, TokenRedirectOutAppend:
 			p.advance()
 			if p.cur.Type == TokenWord {
 				cmd.RedirectOutput = Redirect{
-					TokenType: TokenRedirectOut,
+					TokenType: curType,
 					FileName:  p.cur.Val,
 				}
 				p.advance()
 			}
-		case TokenRedirectErr:
+		case TokenRedirectErr, TokenRedirectErrAppend:
 			p.advance()
 			if p.cur.Type == TokenWord {
 				cmd.RedirectErr = Redirect{
-					TokenType: TokenRedirectErr,
+					TokenType: curType,
 					FileName:  p.cur.Val,
 				}
 				p.advance()

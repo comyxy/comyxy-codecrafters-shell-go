@@ -71,8 +71,14 @@ func (c *Command) execEcho() error {
 	writer := os.Stdout
 
 	redirectOutput := c.RedirectOutput
-	if redirectOutput.TokenType == TokenRedirectOut {
-		f, err := os.Create(redirectOutput.FileName)
+	if redirectOutput.TokenType == TokenRedirectOut || redirectOutput.TokenType == TokenRedirectOutAppend {
+		var f *os.File
+		var err error
+		if redirectOutput.TokenType == TokenRedirectOut {
+			f, err = os.Create(redirectOutput.FileName)
+		} else {
+			f, err = os.OpenFile(redirectOutput.FileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", "echo", redirectOutput.FileName, err)
 			return err
@@ -82,8 +88,14 @@ func (c *Command) execEcho() error {
 	}
 
 	redirectErr := c.RedirectErr
-	if redirectErr.TokenType == TokenRedirectErr {
-		f, err := os.Create(redirectErr.FileName)
+	if redirectErr.TokenType == TokenRedirectErr || redirectErr.TokenType == TokenRedirectErrAppend {
+		var f *os.File
+		var err error
+		if redirectErr.TokenType == TokenRedirectErr {
+			f, err = os.Create(redirectErr.FileName)
+		} else {
+			f, err = os.OpenFile(redirectErr.FileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", "echo", redirectErr.FileName, err)
 			return err
@@ -145,21 +157,34 @@ func (c *Command) execExternal() error {
 	execCmd.Stderr = os.Stderr
 	execCmd.Stdin = os.Stdin
 
-	if c.RedirectOutput.TokenType == TokenRedirectOut {
-		redirect := c.RedirectOutput
-		f, err := os.Create(redirect.FileName)
+	redirectOutput := c.RedirectOutput
+	if redirectOutput.TokenType == TokenRedirectOut || redirectOutput.TokenType == TokenRedirectOutAppend {
+		var f *os.File
+		var err error
+		if redirectOutput.TokenType == TokenRedirectOut {
+			f, err = os.Create(redirectOutput.FileName)
+		} else {
+			f, err = os.OpenFile(redirectOutput.FileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", cmdName, redirect.FileName, err)
+			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", cmdName, redirectOutput.FileName, err)
 			return err
 		}
 		defer f.Close()
 		execCmd.Stdout = f
 	}
-	if c.RedirectErr.TokenType == TokenRedirectErr {
-		redirect := c.RedirectErr
-		f, err := os.Create(redirect.FileName)
+
+	redirectErr := c.RedirectErr
+	if redirectErr.TokenType == TokenRedirectErr || redirectErr.TokenType == TokenRedirectErrAppend {
+		var f *os.File
+		var err error
+		if redirectErr.TokenType == TokenRedirectErr {
+			f, err = os.Create(redirectErr.FileName)
+		} else {
+			f, err = os.OpenFile(redirectErr.FileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", cmdName, redirect.FileName, err)
+			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", cmdName, redirectErr.FileName, err)
 			return err
 		}
 		defer f.Close()

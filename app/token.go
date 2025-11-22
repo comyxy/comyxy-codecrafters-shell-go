@@ -5,8 +5,10 @@ type TokenType int
 const (
 	TokenEOF TokenType = iota + 1
 	TokenWord
-	TokenRedirectOut // >
-	TokenRedirectErr
+	TokenRedirectOut       // 1>
+	TokenRedirectOutAppend // 1>>
+	TokenRedirectErr       // 2>
+	TokenRedirectErrAppend // 2>>
 )
 
 type Token struct {
