@@ -37,6 +37,15 @@ func (p *Parser) Parse() *Command {
 				}
 				p.advance()
 			}
+		case TokenRedirectErr:
+			p.advance()
+			if p.cur.Type == TokenWord {
+				cmd.RedirectErr = Redirect{
+					TokenType: TokenRedirectErr,
+					FileName:  p.cur.Val,
+				}
+				p.advance()
+			}
 		default:
 			p.advance()
 		}

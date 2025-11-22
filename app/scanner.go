@@ -41,6 +41,16 @@ func (sc *Scanner) Scan() []Token {
 				word := sc.scanWord()
 				res = append(res, NewToken(TokenWord, word))
 			}
+		case '2': // redirect err
+			nextChar := sc.peek()
+			if nextChar == '>' {
+				res = append(res, NewToken(TokenRedirectErr, ""))
+				sc.advance()
+				sc.advance()
+			} else {
+				word := sc.scanWord()
+				res = append(res, NewToken(TokenWord, word))
+			}
 		default:
 			word := sc.scanWord()
 			res = append(res, NewToken(TokenWord, word))

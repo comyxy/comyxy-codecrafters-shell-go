@@ -30,6 +30,7 @@ type Redirect struct {
 type Command struct {
 	Args           []string
 	RedirectOutput Redirect
+	RedirectErr    Redirect
 }
 
 func (c *Command) Exec() {
@@ -60,45 +61,6 @@ func (c *Command) execInternal() {
 	}
 }
 
-func (c *Command) execExternal() error {
-	cmdName := c.Args[0]
-	options := c.Args[1:]
-
-	absPath, err := exec.LookPath(cmdName)
-	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			fmt.Fprintf(os.Stdout, "%s: command not found\n", cmdName)
-			return nil
-		}
-		fmt.Printf("fail to LookPath: %v\n", err)
-		return err
-	}
-
-	execCmd := exec.Command(absPath, options...)
-	// Set argv to use original command name as argv[0]
-	execCmd.Args[0] = cmdName
-	execCmd.Stdout = os.Stdout
-	execCmd.Stderr = os.Stderr
-	execCmd.Stdin = os.Stdin
-
-	if c.RedirectOutput.TokenType == TokenRedirectOut {
-		redirect := c.RedirectOutput
-		f, err := os.Create(redirect.FileName)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", cmdName, redirect.FileName, err)
-			return err
-		}
-		defer f.Close()
-		execCmd.Stdout = f
-	}
-
-	err = execCmd.Run()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (c *Command) execExit() {
 	os.Exit(0)
 }
@@ -107,8 +69,8 @@ func (c *Command) execEcho() error {
 	options := c.Args[1:]
 
 	writer := os.Stdout
-	redirectOutput := c.RedirectOutput
 
+	redirectOutput := c.RedirectOutput
 	if redirectOutput.TokenType == TokenRedirectOut {
 		f, err := os.Create(redirectOutput.FileName)
 		if err != nil {
@@ -117,6 +79,16 @@ func (c *Command) execEcho() error {
 		}
 		defer f.Close()
 		writer = f
+	}
+
+	redirectErr := c.RedirectErr
+	if redirectErr.TokenType == TokenRedirectErr {
+		f, err := os.Create(redirectErr.FileName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", "echo", redirectErr.FileName, err)
+			return err
+		}
+		defer f.Close()
 	}
 
 	r := strings.Join(options, " ")
@@ -150,4 +122,53 @@ func (c *Command) execType() {
 
 	fmt.Fprintf(os.Stdout, "%s is %s\n", cmdName, absPath)
 	return
+}
+
+func (c *Command) execExternal() error {
+	cmdName := c.Args[0]
+	options := c.Args[1:]
+
+	absPath, err := exec.LookPath(cmdName)
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			fmt.Fprintf(os.Stdout, "%s: command not found\n", cmdName)
+			return nil
+		}
+		fmt.Printf("fail to LookPath: %v\n", err)
+		return err
+	}
+
+	execCmd := exec.Command(absPath, options...)
+	// Set argv to use original command name as argv[0]
+	execCmd.Args[0] = cmdName
+	execCmd.Stdout = os.Stdout
+	execCmd.Stderr = os.Stderr
+	execCmd.Stdin = os.Stdin
+
+	if c.RedirectOutput.TokenType == TokenRedirectOut {
+		redirect := c.RedirectOutput
+		f, err := os.Create(redirect.FileName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", cmdName, redirect.FileName, err)
+			return err
+		}
+		defer f.Close()
+		execCmd.Stdout = f
+	}
+	if c.RedirectErr.TokenType == TokenRedirectErr {
+		redirect := c.RedirectErr
+		f, err := os.Create(redirect.FileName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", cmdName, redirect.FileName, err)
+			return err
+		}
+		defer f.Close()
+		execCmd.Stderr = f
+	}
+
+	err = execCmd.Run()
+	if err != nil {
+		return err
+	}
+	return nil
 }
