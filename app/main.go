@@ -23,7 +23,9 @@ func main() {
 
 		input = strings.Trim(input, "\n\r")
 
-		args := NewParser().Parse(input)
+		//args := NewParser().Parse(input)
+
+		args := NewScanner(input).Scan()
 
 		NewCommand(args).Exec()
 	}
