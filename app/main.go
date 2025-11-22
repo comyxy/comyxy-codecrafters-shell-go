@@ -25,8 +25,10 @@ func main() {
 
 		//args := NewParser().Parse(input)
 
-		args := NewScanner(input).Scan()
+		tokens := NewScanner(input).Scan()
 
-		NewCommand(args).Exec()
+		cmd := NewParser(tokens).Parse()
+
+		cmd.Exec()
 	}
 }

@@ -22,14 +22,14 @@ var (
 	}
 )
 
-type Command struct {
-	Args []string
+type Redirect struct {
+	TokenType TokenType
+	FileName  string
 }
 
-func NewCommand(args []string) *Command {
-	return &Command{
-		Args: args,
-	}
+type Command struct {
+	Args           []string
+	RedirectOutput Redirect
 }
 
 func (c *Command) Exec() {
@@ -44,7 +44,7 @@ func (c *Command) Exec() {
 		return
 	}
 
-	c.execExternal()
+	_ = c.execExternal()
 }
 
 func (c *Command) execInternal() {
@@ -54,13 +54,13 @@ func (c *Command) execInternal() {
 	case cmdExit:
 		c.execExit()
 	case cmdEcho:
-		c.execEcho()
+		_ = c.execEcho()
 	case cmdType:
 		c.execType()
 	}
 }
 
-func (c *Command) execExternal() {
+func (c *Command) execExternal() error {
 	cmdName := c.Args[0]
 	options := c.Args[1:]
 
@@ -68,10 +68,10 @@ func (c *Command) execExternal() {
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			fmt.Fprintf(os.Stdout, "%s: command not found\n", cmdName)
-			return
+			return nil
 		}
 		fmt.Printf("fail to LookPath: %v\n", err)
-		return
+		return err
 	}
 
 	execCmd := exec.Command(absPath, options...)
@@ -81,22 +81,47 @@ func (c *Command) execExternal() {
 	execCmd.Stderr = os.Stderr
 	execCmd.Stdin = os.Stdin
 
+	if c.RedirectOutput.TokenType == TokenRedirectOut {
+		redirect := c.RedirectOutput
+		f, err := os.Create(redirect.FileName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", cmdName, redirect.FileName, err)
+			return err
+		}
+		defer f.Close()
+		execCmd.Stdout = f
+	}
+
 	err = execCmd.Run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "fail to exec %s: %v\n", absPath, err)
-		return
+		return err
 	}
+	return nil
 }
 
 func (c *Command) execExit() {
 	os.Exit(0)
 }
 
-func (c *Command) execEcho() {
+func (c *Command) execEcho() error {
 	options := c.Args[1:]
 
+	writer := os.Stdout
+	redirectOutput := c.RedirectOutput
+
+	if redirectOutput.TokenType == TokenRedirectOut {
+		f, err := os.Create(redirectOutput.FileName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", "echo", redirectOutput.FileName, err)
+			return err
+		}
+		defer f.Close()
+		writer = f
+	}
+
 	r := strings.Join(options, " ")
-	fmt.Fprintln(os.Stdout, r)
+	fmt.Fprintln(writer, r)
+	return nil
 }
 
 func (c *Command) execType() {

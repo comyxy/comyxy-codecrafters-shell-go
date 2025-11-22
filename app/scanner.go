@@ -20,17 +20,30 @@ func NewScanner(input string) *Scanner {
 	return scanner
 }
 
-func (sc *Scanner) Scan() []string {
-	var res []string
+func (sc *Scanner) Scan() []Token {
+	var res []Token
 
 	for sc.cur != 0 {
 
 		switch sc.cur {
 		case ' ':
 			sc.advance()
+		case '>': // redirect out
+			sc.advance()
+			res = append(res, NewToken(TokenRedirectOut, ""))
+		case '1': // redirect out
+			nextChar := sc.peek()
+			if nextChar == '>' {
+				res = append(res, NewToken(TokenRedirectOut, ""))
+				sc.advance()
+				sc.advance()
+			} else {
+				word := sc.scanWord()
+				res = append(res, NewToken(TokenWord, word))
+			}
 		default:
 			word := sc.scanWord()
-			res = append(res, word)
+			res = append(res, NewToken(TokenWord, word))
 		}
 	}
 
