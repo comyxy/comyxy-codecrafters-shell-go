@@ -9,6 +9,8 @@ const (
 	TokenRedirectOutAppend // 1>>
 	TokenRedirectErr       // 2>
 	TokenRedirectErrAppend // 2>>
+	TokenPipeline          // |
+	TokenRedirectIn        // <
 )
 
 type Token struct {
@@ -29,6 +31,14 @@ func (t TokenType) String() string {
 		return "WORD"
 	case TokenRedirectOut:
 		return "REDIRECT_OUT"
+	case TokenRedirectOutAppend:
+		return "REDIRECT_OUT_APPEND"
+	case TokenRedirectErr:
+		return "REDIRECT_ERR"
+	case TokenRedirectErrAppend:
+		return "REDIRECT_ERRAPPEND"
+	case TokenPipeline:
+		return "PIPELINE"
 	default:
 		return "UNKNOWN"
 	}

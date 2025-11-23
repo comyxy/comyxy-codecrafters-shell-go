@@ -17,12 +17,31 @@ func NewParser(tokens []Token) *Parser {
 	return p
 }
 
-func (p *Parser) Parse() *Command {
-	cmd := &Command{
-		Args: []string{},
+func (p *Parser) ParsePipeline() []*Command {
+	var cmds []*Command
+
+	for {
+		cmd := p.Parse()
+
+		if len(cmd.Args) > 0 {
+			cmds = append(cmds, cmd)
+		}
+
+		if p.cur.Type == TokenPipeline {
+			p.advance()
+			continue
+		}
+
+		break
 	}
 
-	for p.cur.Type != TokenEOF {
+	return cmds
+}
+
+func (p *Parser) Parse() *Command {
+	cmd := NewCommand()
+
+	for p.cur.Type != TokenEOF && p.cur.Type != TokenPipeline {
 
 		curType := p.cur.Type
 

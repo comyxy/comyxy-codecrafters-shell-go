@@ -23,12 +23,42 @@ func main() {
 
 		input = strings.Trim(input, "\n\r")
 
-		//args := NewParser().Parse(input)
-
 		tokens := NewScanner(input).Scan()
 
-		cmd := NewParser(tokens).Parse()
+		cmds := NewParser(tokens).ParsePipeline()
 
-		cmd.Exec()
+		if len(cmds) == 0 {
+			continue
+		} else if len(cmds) == 1 {
+			cmds[0].Exec()
+		} else {
+			for i := 0; i < len(cmds)-1; i++ {
+				curCmd := cmds[i]
+				nextCmd := cmds[i+1]
+
+				pr, pw, err := os.Pipe()
+				if err != nil {
+					fmt.Fprintln(os.Stderr, err)
+					break
+				}
+
+				nextCmd.Stdin = pr
+				curCmd.Stdout = pw
+			}
+
+			for i := len(cmds) - 1; i >= 0; i-- {
+				cmds[i].Start()
+			}
+
+			for i := 0; i < len(cmds); i++ {
+				cmds[i].Wait()
+				if i > 0 {
+					cmds[i].Stdin.Close()
+				}
+				if i < len(cmds)-1 {
+					cmds[i].Stdout.Close()
+				}
+			}
+		}
 	}
 }

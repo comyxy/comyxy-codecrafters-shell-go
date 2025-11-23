@@ -67,6 +67,9 @@ func (sc *Scanner) Scan() []Token {
 				word := sc.scanWord()
 				res = append(res, NewToken(TokenWord, word))
 			}
+		case '|':
+			res = append(res, NewToken(TokenPipeline, "|"))
+			sc.advance()
 		default:
 			word := sc.scanWord()
 			res = append(res, NewToken(TokenWord, word))

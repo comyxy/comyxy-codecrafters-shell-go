@@ -26,17 +26,17 @@ var (
 	}
 )
 
-type RedirectFile struct {
-	*os.File
+type IoFile struct {
+	File *os.File
 
 	TokenType TokenType
 }
 
-func NewRedirectFile(file *os.File, tokenType TokenType) *RedirectFile {
-	return &RedirectFile{File: file, TokenType: tokenType}
+func NewIoFile(file *os.File, tokenType TokenType) *IoFile {
+	return &IoFile{File: file, TokenType: tokenType}
 }
 
-func (f *RedirectFile) Close() error {
+func (f *IoFile) Close() error {
 	if (f.TokenType == TokenRedirectOut || f.TokenType == TokenRedirectOutAppend) && f.File == os.Stdout {
 		return f.File.Close()
 	}
@@ -57,6 +57,104 @@ type Command struct {
 	Args           []string
 	RedirectOutput Redirect
 	RedirectErr    Redirect
+	RedirectIn     Redirect
+
+	Stdin  *os.File
+	Stdout *os.File
+	Stderr *os.File
+
+	externCmd *exec.Cmd
+}
+
+func NewCommand() *Command {
+	return &Command{
+		Args:           nil,
+		RedirectOutput: Redirect{},
+		RedirectErr:    Redirect{},
+		RedirectIn:     Redirect{},
+		Stdin:          os.Stdin,
+		Stdout:         os.Stdout,
+		Stderr:         os.Stderr,
+	}
+}
+
+func (c *Command) Start() error {
+	if len(c.Args) == 0 {
+		return nil
+	}
+
+	cmdName := c.Args[0]
+
+	if builtinMap[cmdName] {
+		//return c.startInternal()
+	}
+
+	return c.startExternal()
+}
+
+func (c *Command) Wait() error {
+	if len(c.Args) == 0 {
+		return nil
+	}
+
+	cmdName := c.Args[0]
+
+	if builtinMap[cmdName] {
+		//return c.waitInternal()
+	}
+
+	return c.waitExternal()
+}
+
+func (c *Command) startExternal() error {
+	cmdName := c.Args[0]
+	options := c.Args[1:]
+
+	absPath, err := exec.LookPath(cmdName)
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			fmt.Fprintf(os.Stdout, "%s: command not found\n", cmdName)
+			return nil
+		}
+		fmt.Printf("fail to LookPath: %v\n", err)
+		return err
+	}
+
+	execCmd := exec.Command(absPath, options...)
+	c.externCmd = execCmd
+	// Set argv to use original command name as argv[0]
+	execCmd.Args[0] = cmdName
+
+	reader, err := c.getInFile()
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+	execCmd.Stdin = reader.File
+
+	writer, err := c.getOutFile()
+	if err != nil {
+		return err
+	}
+	defer writer.Close()
+	execCmd.Stdout = writer.File
+
+	errWriter, err := c.getErrFile()
+	if err != nil {
+		return err
+	}
+	defer errWriter.Close()
+	execCmd.Stderr = errWriter.File
+
+	err = execCmd.Start()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Command) waitExternal() error {
+	return c.externCmd.Wait()
 }
 
 func (c *Command) Exec() {
@@ -103,7 +201,7 @@ func (c *Command) execPwd() error {
 	}
 	defer outWriter.Close()
 
-	fmt.Fprintln(outWriter, dir)
+	fmt.Fprintln(outWriter.File, dir)
 
 	return nil
 }
@@ -131,7 +229,7 @@ func (c *Command) execCd() error {
 	if err != nil {
 		var pathErr *os.PathError
 		if errors.As(err, &pathErr) {
-			fmt.Fprintf(errFile, "%s: %s: %s\n", "cd", pathErr.Path, "No such file or directory")
+			fmt.Fprintf(errFile.File, "%s: %s: %s\n", "cd", pathErr.Path, "No such file or directory")
 		}
 		return err
 	}
@@ -158,7 +256,7 @@ func (c *Command) execEcho() error {
 	defer errWriter.Close()
 
 	r := strings.Join(options, " ")
-	fmt.Fprintln(writer, r)
+	fmt.Fprintln(writer.File, r)
 	return nil
 }
 
@@ -207,21 +305,27 @@ func (c *Command) execExternal() error {
 	execCmd := exec.Command(absPath, options...)
 	// Set argv to use original command name as argv[0]
 	execCmd.Args[0] = cmdName
-	execCmd.Stdin = os.Stdin
+
+	reader, err := c.getInFile()
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+	execCmd.Stdin = reader.File
 
 	writer, err := c.getOutFile()
 	if err != nil {
 		return err
 	}
 	defer writer.Close()
-	execCmd.Stdout = writer
+	execCmd.Stdout = writer.File
 
 	errWriter, err := c.getErrFile()
 	if err != nil {
 		return err
 	}
 	defer errWriter.Close()
-	execCmd.Stderr = errWriter
+	execCmd.Stderr = errWriter.File
 
 	err = execCmd.Run()
 	if err != nil {
@@ -230,8 +334,8 @@ func (c *Command) execExternal() error {
 	return nil
 }
 
-func (c *Command) getOutFile() (*RedirectFile, error) {
-	writer := os.Stdout
+func (c *Command) getOutFile() (*IoFile, error) {
+	writer := c.Stdout
 
 	redirectOutput := c.RedirectOutput
 	if redirectOutput.TokenType == TokenRedirectOut || redirectOutput.TokenType == TokenRedirectOutAppend {
@@ -249,11 +353,12 @@ func (c *Command) getOutFile() (*RedirectFile, error) {
 		writer = f
 	}
 
-	return NewRedirectFile(writer, c.RedirectOutput.TokenType), nil
+	return NewIoFile(writer, c.RedirectOutput.TokenType), nil
 }
 
-func (c *Command) getErrFile() (*RedirectFile, error) {
-	writer := os.Stderr
+func (c *Command) getErrFile() (*IoFile, error) {
+	writer := c.Stderr
+
 	redirectErr := c.RedirectErr
 	if redirectErr.TokenType == TokenRedirectErr || redirectErr.TokenType == TokenRedirectErrAppend {
 		var f *os.File
@@ -269,5 +374,11 @@ func (c *Command) getErrFile() (*RedirectFile, error) {
 		}
 		writer = f
 	}
-	return NewRedirectFile(writer, c.RedirectErr.TokenType), nil
+	return NewIoFile(writer, c.RedirectErr.TokenType), nil
+}
+
+func (c *Command) getInFile() (*IoFile, error) {
+	reader := c.Stdin
+
+	return NewIoFile(reader, c.RedirectIn.TokenType), nil
 }
