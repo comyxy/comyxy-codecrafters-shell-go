@@ -10,6 +10,7 @@ import (
 
 const (
 	cmdPwd  = "pwd"
+	cmdCd   = "cd"
 	cmdExit = "exit"
 	cmdEcho = "echo"
 	cmdType = "type"
@@ -18,6 +19,7 @@ const (
 var (
 	builtinMap = map[string]bool{
 		cmdPwd:  true,
+		cmdCd:   true,
 		cmdExit: true,
 		cmdEcho: true,
 		cmdType: true,
@@ -78,6 +80,8 @@ func (c *Command) execInternal() {
 	switch cmdName {
 	case cmdPwd:
 		_ = c.execPwd()
+	case cmdCd:
+		_ = c.execCd()
 	case cmdExit:
 		c.execExit()
 	case cmdEcho:
@@ -101,6 +105,28 @@ func (c *Command) execPwd() error {
 
 	fmt.Fprintln(outWriter, dir)
 
+	return nil
+}
+
+func (c *Command) execCd() error {
+	if len(c.Args) < 2 {
+		return nil
+	}
+
+	errFile, err := c.getErrFile()
+	if err != nil {
+		return err
+	}
+	defer errFile.Close()
+
+	err = os.Chdir(c.Args[1])
+	if err != nil {
+		var pathErr *os.PathError
+		if errors.As(err, &pathErr) {
+			fmt.Fprintf(errFile, "%s: %s: %s\n", "cd", pathErr.Path, "No such file or directory")
+		}
+		return err
+	}
 	return nil
 }
 
