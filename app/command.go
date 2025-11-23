@@ -119,7 +119,15 @@ func (c *Command) execCd() error {
 	}
 	defer errFile.Close()
 
-	err = os.Chdir(c.Args[1])
+	dir := c.Args[1]
+	if dir == "~" {
+		dir, err = os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+	}
+
+	err = os.Chdir(dir)
 	if err != nil {
 		var pathErr *os.PathError
 		if errors.As(err, &pathErr) {
