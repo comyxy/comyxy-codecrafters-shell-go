@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	cmdPwd  = "pwd"
 	cmdExit = "exit"
 	cmdEcho = "echo"
 	cmdType = "type"
@@ -16,11 +17,34 @@ const (
 
 var (
 	builtinMap = map[string]bool{
+		cmdPwd:  true,
 		cmdExit: true,
 		cmdEcho: true,
 		cmdType: true,
 	}
 )
+
+type RedirectFile struct {
+	*os.File
+
+	TokenType TokenType
+}
+
+func NewRedirectFile(file *os.File, tokenType TokenType) *RedirectFile {
+	return &RedirectFile{File: file, TokenType: tokenType}
+}
+
+func (f *RedirectFile) Close() error {
+	if (f.TokenType == TokenRedirectOut || f.TokenType == TokenRedirectOutAppend) && f.File == os.Stdout {
+		return f.File.Close()
+	}
+
+	if (f.TokenType == TokenRedirectErr || f.TokenType == TokenRedirectErrAppend) && f.File == os.Stderr {
+		return f.File.Close()
+	}
+
+	return nil
+}
 
 type Redirect struct {
 	TokenType TokenType
@@ -52,6 +76,8 @@ func (c *Command) execInternal() {
 	cmdName := c.Args[0]
 
 	switch cmdName {
+	case cmdPwd:
+		_ = c.execPwd()
 	case cmdExit:
 		c.execExit()
 	case cmdEcho:
@@ -61,6 +87,23 @@ func (c *Command) execInternal() {
 	}
 }
 
+func (c *Command) execPwd() error {
+	dir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	outWriter, err := c.getOutFile()
+	if err != nil {
+		return err
+	}
+	defer outWriter.Close()
+
+	fmt.Fprintln(outWriter, dir)
+
+	return nil
+}
+
 func (c *Command) execExit() {
 	os.Exit(0)
 }
@@ -68,40 +111,17 @@ func (c *Command) execExit() {
 func (c *Command) execEcho() error {
 	options := c.Args[1:]
 
-	writer := os.Stdout
-
-	redirectOutput := c.RedirectOutput
-	if redirectOutput.TokenType == TokenRedirectOut || redirectOutput.TokenType == TokenRedirectOutAppend {
-		var f *os.File
-		var err error
-		if redirectOutput.TokenType == TokenRedirectOut {
-			f, err = os.Create(redirectOutput.FileName)
-		} else {
-			f, err = os.OpenFile(redirectOutput.FileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-		}
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", "echo", redirectOutput.FileName, err)
-			return err
-		}
-		defer f.Close()
-		writer = f
+	writer, err := c.getOutFile()
+	if err != nil {
+		return err
 	}
+	defer writer.Close()
 
-	redirectErr := c.RedirectErr
-	if redirectErr.TokenType == TokenRedirectErr || redirectErr.TokenType == TokenRedirectErrAppend {
-		var f *os.File
-		var err error
-		if redirectErr.TokenType == TokenRedirectErr {
-			f, err = os.Create(redirectErr.FileName)
-		} else {
-			f, err = os.OpenFile(redirectErr.FileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-		}
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", "echo", redirectErr.FileName, err)
-			return err
-		}
-		defer f.Close()
+	errWriter, err := c.getErrFile()
+	if err != nil {
+		return err
 	}
+	defer errWriter.Close()
 
 	r := strings.Join(options, " ")
 	fmt.Fprintln(writer, r)
@@ -153,9 +173,31 @@ func (c *Command) execExternal() error {
 	execCmd := exec.Command(absPath, options...)
 	// Set argv to use original command name as argv[0]
 	execCmd.Args[0] = cmdName
-	execCmd.Stdout = os.Stdout
-	execCmd.Stderr = os.Stderr
 	execCmd.Stdin = os.Stdin
+
+	writer, err := c.getOutFile()
+	if err != nil {
+		return err
+	}
+	defer writer.Close()
+	execCmd.Stdout = writer
+
+	errWriter, err := c.getErrFile()
+	if err != nil {
+		return err
+	}
+	defer errWriter.Close()
+	execCmd.Stderr = errWriter
+
+	err = execCmd.Run()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Command) getOutFile() (*RedirectFile, error) {
+	writer := os.Stdout
 
 	redirectOutput := c.RedirectOutput
 	if redirectOutput.TokenType == TokenRedirectOut || redirectOutput.TokenType == TokenRedirectOutAppend {
@@ -167,13 +209,17 @@ func (c *Command) execExternal() error {
 			f, err = os.OpenFile(redirectOutput.FileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", cmdName, redirectOutput.FileName, err)
-			return err
+			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", c.Args[0], redirectOutput.FileName, err)
+			return nil, err
 		}
-		defer f.Close()
-		execCmd.Stdout = f
+		writer = f
 	}
 
+	return NewRedirectFile(writer, c.RedirectOutput.TokenType), nil
+}
+
+func (c *Command) getErrFile() (*RedirectFile, error) {
+	writer := os.Stderr
 	redirectErr := c.RedirectErr
 	if redirectErr.TokenType == TokenRedirectErr || redirectErr.TokenType == TokenRedirectErrAppend {
 		var f *os.File
@@ -184,16 +230,10 @@ func (c *Command) execExternal() error {
 			f, err = os.OpenFile(redirectErr.FileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", cmdName, redirectErr.FileName, err)
-			return err
+			fmt.Fprintf(os.Stderr, "%s: %s: %s\n", c.Args[0], redirectErr.FileName, err)
+			return nil, err
 		}
-		defer f.Close()
-		execCmd.Stderr = f
+		writer = f
 	}
-
-	err = execCmd.Run()
-	if err != nil {
-		return err
-	}
-	return nil
+	return NewRedirectFile(writer, c.RedirectErr.TokenType), nil
 }
