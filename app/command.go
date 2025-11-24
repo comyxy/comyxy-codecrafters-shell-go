@@ -312,7 +312,7 @@ func (c *Command) execHistory() error {
 	defer file.Close()
 
 	for idx, history := range c.sh.historyList {
-		fmt.Fprintf(file.File, "%d: %s", idx+1, history)
+		fmt.Fprintf(file.File, "    %d  %s", idx+1, history)
 	}
 	return nil
 }
