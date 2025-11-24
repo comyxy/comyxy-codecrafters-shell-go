@@ -98,17 +98,13 @@ func (c *Command) Wait() error {
 		return nil
 	}
 
-	cmdName := c.Args[0]
-
-	if builtinMap[cmdName] {
-		return c.waitInternal()
+	if c.waitFunc != nil {
+		err := c.waitFunc()
+		if err != nil {
+			return err
+		}
 	}
-
-	return c.waitExternal()
-}
-
-func (c *Command) waitInternal() error {
-	return c.waitFunc()
+	return nil
 }
 
 func (c *Command) startExternal() error {
@@ -161,23 +157,30 @@ func (c *Command) startExternal() error {
 	return nil
 }
 
-func (c *Command) waitExternal() error {
-	return c.waitFunc()
-}
-
-func (c *Command) Exec() {
+func (c *Command) Exec() error {
 	if len(c.Args) == 0 {
-		return
+		return nil
 	}
 
 	cmdName := c.Args[0]
 
+	var err error
 	if builtinMap[cmdName] {
-		c.execInternal()
-		return
+		err = c.startInternal()
+	} else {
+		err = c.startExternal()
+	}
+	if err != nil {
+		return err
 	}
 
-	_ = c.execExternal()
+	if c.waitFunc != nil {
+		err := c.waitFunc()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *Command) startInternal() error {
@@ -319,52 +322,6 @@ func (c *Command) execType() {
 
 	fmt.Fprintf(os.Stdout, "%s is %s\n", cmdName, absPath)
 	return
-}
-
-func (c *Command) execExternal() error {
-	cmdName := c.Args[0]
-	options := c.Args[1:]
-
-	absPath, err := exec.LookPath(cmdName)
-	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			fmt.Fprintf(os.Stdout, "%s: command not found\n", cmdName)
-			return nil
-		}
-		fmt.Printf("fail to LookPath: %v\n", err)
-		return err
-	}
-
-	execCmd := exec.Command(absPath, options...)
-	// Set argv to use original command name as argv[0]
-	execCmd.Args[0] = cmdName
-
-	reader, err := c.getInFile()
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-	execCmd.Stdin = reader.File
-
-	writer, err := c.getOutFile()
-	if err != nil {
-		return err
-	}
-	defer writer.Close()
-	execCmd.Stdout = writer.File
-
-	errWriter, err := c.getErrFile()
-	if err != nil {
-		return err
-	}
-	defer errWriter.Close()
-	execCmd.Stderr = errWriter.File
-
-	err = execCmd.Run()
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (c *Command) getOutFile() (*IoFile, error) {
