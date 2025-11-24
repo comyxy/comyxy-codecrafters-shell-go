@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 )
 
 const (
@@ -63,7 +64,7 @@ type Command struct {
 	Stdout *os.File
 	Stderr *os.File
 
-	externCmd *exec.Cmd
+	waitFunc func() error
 }
 
 func NewCommand() *Command {
@@ -86,7 +87,7 @@ func (c *Command) Start() error {
 	cmdName := c.Args[0]
 
 	if builtinMap[cmdName] {
-		//return c.startInternal()
+		return c.startInternal()
 	}
 
 	return c.startExternal()
@@ -100,10 +101,14 @@ func (c *Command) Wait() error {
 	cmdName := c.Args[0]
 
 	if builtinMap[cmdName] {
-		//return c.waitInternal()
+		return c.waitInternal()
 	}
 
 	return c.waitExternal()
+}
+
+func (c *Command) waitInternal() error {
+	return c.waitFunc()
 }
 
 func (c *Command) startExternal() error {
@@ -121,7 +126,7 @@ func (c *Command) startExternal() error {
 	}
 
 	execCmd := exec.Command(absPath, options...)
-	c.externCmd = execCmd
+
 	// Set argv to use original command name as argv[0]
 	execCmd.Args[0] = cmdName
 
@@ -150,11 +155,14 @@ func (c *Command) startExternal() error {
 	if err != nil {
 		return err
 	}
+	c.waitFunc = func() error {
+		return execCmd.Wait()
+	}
 	return nil
 }
 
 func (c *Command) waitExternal() error {
-	return c.externCmd.Wait()
+	return c.waitFunc()
 }
 
 func (c *Command) Exec() {
@@ -172,21 +180,46 @@ func (c *Command) Exec() {
 	_ = c.execExternal()
 }
 
-func (c *Command) execInternal() {
+func (c *Command) startInternal() error {
+	var wg sync.WaitGroup
+	var err error
+
+	wg.Add(1)
+	go func() {
+		defer func() {
+			if e := recover(); e != nil {
+				err = fmt.Errorf("panic: %v", e)
+			}
+		}()
+
+		err = c.execInternal()
+		wg.Done()
+	}()
+
+	c.waitFunc = func() error {
+		wg.Wait()
+		return nil
+	}
+	return err
+}
+
+func (c *Command) execInternal() error {
 	cmdName := c.Args[0]
 
+	var err error
 	switch cmdName {
 	case cmdPwd:
-		_ = c.execPwd()
+		err = c.execPwd()
 	case cmdCd:
-		_ = c.execCd()
+		err = c.execCd()
 	case cmdExit:
 		c.execExit()
 	case cmdEcho:
-		_ = c.execEcho()
+		err = c.execEcho()
 	case cmdType:
 		c.execType()
 	}
+	return err
 }
 
 func (c *Command) execPwd() error {
