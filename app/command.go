@@ -10,20 +10,22 @@ import (
 )
 
 const (
-	cmdPwd  = "pwd"
-	cmdCd   = "cd"
-	cmdExit = "exit"
-	cmdEcho = "echo"
-	cmdType = "type"
+	cmdPwd     = "pwd"
+	cmdCd      = "cd"
+	cmdExit    = "exit"
+	cmdEcho    = "echo"
+	cmdType    = "type"
+	cmdHistory = "history"
 )
 
 var (
 	builtinMap = map[string]bool{
-		cmdPwd:  true,
-		cmdCd:   true,
-		cmdExit: true,
-		cmdEcho: true,
-		cmdType: true,
+		cmdPwd:     true,
+		cmdCd:      true,
+		cmdExit:    true,
+		cmdEcho:    true,
+		cmdType:    true,
+		cmdHistory: true,
 	}
 )
 
@@ -65,9 +67,10 @@ type Command struct {
 	Stderr *os.File
 
 	waitFunc func() error
+	sh       *Shell
 }
 
-func NewCommand() *Command {
+func NewCommand(sh *Shell) *Command {
 	return &Command{
 		Args:           nil,
 		RedirectOutput: Redirect{},
@@ -76,6 +79,7 @@ func NewCommand() *Command {
 		Stdin:          os.Stdin,
 		Stdout:         os.Stdout,
 		Stderr:         os.Stderr,
+		sh:             sh,
 	}
 }
 
@@ -157,32 +161,6 @@ func (c *Command) startExternal() error {
 	return nil
 }
 
-func (c *Command) Exec() error {
-	if len(c.Args) == 0 {
-		return nil
-	}
-
-	cmdName := c.Args[0]
-
-	var err error
-	if builtinMap[cmdName] {
-		err = c.startInternal()
-	} else {
-		err = c.startExternal()
-	}
-	if err != nil {
-		return err
-	}
-
-	if c.waitFunc != nil {
-		err := c.waitFunc()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (c *Command) startInternal() error {
 	var wg sync.WaitGroup
 	var err error
@@ -221,6 +199,8 @@ func (c *Command) execInternal() error {
 		err = c.execEcho()
 	case cmdType:
 		c.execType()
+	case cmdHistory:
+		err = c.execHistory()
 	}
 	return err
 }
@@ -322,6 +302,19 @@ func (c *Command) execType() {
 
 	fmt.Fprintf(os.Stdout, "%s is %s\n", cmdName, absPath)
 	return
+}
+
+func (c *Command) execHistory() error {
+	file, err := c.getOutFile()
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	for idx, history := range c.sh.historyList {
+		fmt.Fprintf(file.File, "%d: %s", idx+1, history)
+	}
+	return nil
 }
 
 func (c *Command) getOutFile() (*IoFile, error) {
