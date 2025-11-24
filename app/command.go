@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -305,14 +306,34 @@ func (c *Command) execType() {
 }
 
 func (c *Command) execHistory() error {
+	var limit = -1
+	if len(c.Args) >= 2 {
+		limitI64, err := strconv.ParseInt(c.Args[1], 10, 64)
+		if err != nil {
+			return err
+		}
+		limit = int(limitI64)
+		if limit > len(c.sh.historyList) {
+			limit = len(c.sh.historyList)
+		}
+	}
+
 	file, err := c.getOutFile()
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	for idx, history := range c.sh.historyList {
-		fmt.Fprintf(file.File, "    %d  %s", idx+1, history)
+	historyToPrint := c.sh.historyList
+	offset := 1
+	if limit >= 0 {
+		t := len(historyToPrint) - limit
+		offset = t + 1
+		historyToPrint = historyToPrint[t:]
+	}
+
+	for idx, history := range historyToPrint {
+		fmt.Fprintf(file.File, "    %d  %s", idx+offset, history)
 	}
 	return nil
 }
