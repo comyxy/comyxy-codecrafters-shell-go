@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -308,13 +310,44 @@ func (c *Command) execType() {
 func (c *Command) execHistory() error {
 	var limit = -1
 	if len(c.Args) >= 2 {
-		limitI64, err := strconv.ParseInt(c.Args[1], 10, 64)
-		if err != nil {
-			return err
-		}
-		limit = int(limitI64)
-		if limit > len(c.sh.historyList) {
-			limit = len(c.sh.historyList)
+		arg1 := c.Args[1]
+		if arg1 == "-r" {
+			if len(c.Args) >= 3 {
+				arg2 := c.Args[2]
+				historyFile, err := os.Open(arg2)
+				if err != nil {
+					return err
+				}
+				defer historyFile.Close()
+				reader := bufio.NewReader(historyFile)
+				for {
+					line, err := reader.ReadString('\n')
+					if err != nil {
+						if errors.Is(err, io.EOF) {
+							break
+						}
+						return err
+					}
+
+					line = strings.TrimSpace(line)
+
+					if len(line) == 0 {
+						continue
+					}
+
+					c.sh.historyList = append(c.sh.historyList, line)
+				}
+				return nil
+			}
+		} else {
+			limitI64, err := strconv.ParseInt(arg1, 10, 64)
+			if err != nil {
+				return err
+			}
+			limit = int(limitI64)
+			if limit > len(c.sh.historyList) {
+				limit = len(c.sh.historyList)
+			}
 		}
 	}
 
