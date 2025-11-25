@@ -40,6 +40,9 @@ func (sh *Shell) Run() {
 			fmt.Fprintf(os.Stderr, "%s\n", err)
 			return
 		}
+		defer func() {
+			sh.dumpHistory(historyFile)
+		}()
 	}
 
 	for {
@@ -86,6 +89,9 @@ func (sh *Shell) Run() {
 		for i := 0; i < len(cmds); i++ {
 			err := cmds[i].Wait()
 			if err != nil {
+				if errors.Is(err, errExit) {
+					goto finish
+				}
 				break
 			}
 			if i > 0 {
@@ -96,6 +102,8 @@ func (sh *Shell) Run() {
 			}
 		}
 	}
+
+finish:
 }
 
 func (sh *Shell) appendHistory(input string) {
@@ -126,6 +134,18 @@ func (sh *Shell) readHistory(path string) error {
 		}
 
 		sh.historyList = append(sh.historyList, line)
+	}
+	return nil
+}
+
+func (sh *Shell) dumpHistory(path string) error {
+	historyFile, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer historyFile.Close()
+	for _, history := range sh.historyList {
+		fmt.Fprintf(historyFile, "%s\n", history)
 	}
 	return nil
 }

@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 const (
@@ -17,6 +16,10 @@ const (
 	cmdEcho    = "echo"
 	cmdType    = "type"
 	cmdHistory = "history"
+)
+
+var (
+	errExit = errors.New("exit")
 )
 
 var (
@@ -163,26 +166,25 @@ func (c *Command) startExternal() error {
 }
 
 func (c *Command) startInternal() error {
-	var wg sync.WaitGroup
-	var err error
+	errChan := make(chan error)
 
-	wg.Add(1)
 	go func() {
 		defer func() {
 			if e := recover(); e != nil {
-				err = fmt.Errorf("panic: %v", e)
+				err := fmt.Errorf("panic: %v", e)
+				errChan <- err
 			}
 		}()
 
-		err = c.execInternal()
-		wg.Done()
+		err := c.execInternal()
+		errChan <- err
 	}()
 
 	c.waitFunc = func() error {
-		wg.Wait()
-		return nil
+		err := <-errChan
+		return err
 	}
-	return err
+	return nil
 }
 
 func (c *Command) execInternal() error {
@@ -195,7 +197,7 @@ func (c *Command) execInternal() error {
 	case cmdCd:
 		err = c.execCd()
 	case cmdExit:
-		c.execExit()
+		err = c.execExit()
 	case cmdEcho:
 		err = c.execEcho()
 	case cmdType:
@@ -253,8 +255,8 @@ func (c *Command) execCd() error {
 	return nil
 }
 
-func (c *Command) execExit() {
-	os.Exit(0)
+func (c *Command) execExit() error {
+	return errExit
 }
 
 func (c *Command) execEcho() error {
@@ -319,14 +321,9 @@ func (c *Command) execHistory() error {
 			}
 		} else if arg1 == "-w" {
 			if len(c.Args) >= 3 {
-				arg2 := c.Args[2]
-				historyFile, err := os.Create(arg2)
+				err := c.sh.dumpHistory(c.Args[2])
 				if err != nil {
 					return err
-				}
-				defer historyFile.Close()
-				for _, history := range c.sh.historyList {
-					fmt.Fprintf(historyFile, "%s\n", history)
 				}
 				return nil
 			}
