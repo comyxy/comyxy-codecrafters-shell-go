@@ -1,10 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"strings"
+
+	"github.com/chzyer/readline"
 )
 
 type Shell struct {
@@ -18,18 +20,26 @@ func NewShell() *Shell {
 
 func (sh *Shell) Run() {
 
-	for {
-		fmt.Fprint(os.Stdout, "$ ")
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt:      "$ ",
+		HistoryFile: "/tmp/my-shell.history",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rl.Close()
 
-		input, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	for {
+
+		input, err := rl.Readline()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+		
+		input = strings.Trim(input, "\n\r")
 
 		sh.appendHistory(input)
-
-		input = strings.Trim(input, "\n\r")
 
 		tokens := NewScanner(input).Scan()
 

@@ -333,7 +333,7 @@ func (c *Command) execHistory() error {
 	}
 
 	for idx, history := range historyToPrint {
-		fmt.Fprintf(file.File, "    %d  %s", idx+offset, history)
+		fmt.Fprintf(file.File, "    %d  %s\n", idx+offset, history)
 	}
 	return nil
 }
