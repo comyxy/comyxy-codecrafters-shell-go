@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -29,6 +32,15 @@ func (sh *Shell) Run() {
 		log.Fatal(err)
 	}
 	defer rl.Close()
+
+	historyFile := os.Getenv("HISTFILE")
+	if historyFile != "" {
+		err := sh.readHistory(historyFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", err)
+			return
+		}
+	}
 
 	for {
 
@@ -89,4 +101,31 @@ func (sh *Shell) Run() {
 func (sh *Shell) appendHistory(input string) {
 	sh.historyList = append(sh.historyList, input)
 	sh.appendHistoryList = append(sh.appendHistoryList, input)
+}
+
+func (sh *Shell) readHistory(path string) error {
+	historyFile, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer historyFile.Close()
+	reader := bufio.NewReader(historyFile)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		line = strings.TrimSpace(line)
+
+		if len(line) == 0 {
+			continue
+		}
+
+		sh.historyList = append(sh.historyList, line)
+	}
+	return nil
 }
