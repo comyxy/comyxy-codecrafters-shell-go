@@ -339,6 +339,19 @@ func (c *Command) execHistory() error {
 				}
 				return nil
 			}
+		} else if arg1 == "-w" {
+			if len(c.Args) >= 3 {
+				arg2 := c.Args[2]
+				historyFile, err := os.OpenFile(arg2, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+				if err != nil {
+					return err
+				}
+				defer historyFile.Close()
+				for _, history := range c.sh.historyList {
+					fmt.Fprintf(historyFile, "%s\n", history)
+				}
+				return nil
+			}
 		} else {
 			limitI64, err := strconv.ParseInt(arg1, 10, 64)
 			if err != nil {
