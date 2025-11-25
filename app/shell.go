@@ -10,7 +10,8 @@ import (
 )
 
 type Shell struct {
-	historyList []string
+	historyList       []string
+	appendHistoryList []string
 }
 
 func NewShell() *Shell {
@@ -36,7 +37,7 @@ func (sh *Shell) Run() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		
+
 		input = strings.Trim(input, "\n\r")
 
 		sh.appendHistory(input)
@@ -87,4 +88,5 @@ func (sh *Shell) Run() {
 
 func (sh *Shell) appendHistory(input string) {
 	sh.historyList = append(sh.historyList, input)
+	sh.appendHistoryList = append(sh.appendHistoryList, input)
 }

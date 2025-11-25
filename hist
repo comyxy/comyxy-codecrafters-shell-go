@@ -1,0 +1,4 @@
+echo
+history -a hist 
+cat hist
+history -a hist 

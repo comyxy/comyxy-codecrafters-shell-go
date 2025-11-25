@@ -342,7 +342,7 @@ func (c *Command) execHistory() error {
 		} else if arg1 == "-w" {
 			if len(c.Args) >= 3 {
 				arg2 := c.Args[2]
-				historyFile, err := os.OpenFile(arg2, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+				historyFile, err := os.Create(arg2)
 				if err != nil {
 					return err
 				}
@@ -350,6 +350,20 @@ func (c *Command) execHistory() error {
 				for _, history := range c.sh.historyList {
 					fmt.Fprintf(historyFile, "%s\n", history)
 				}
+				return nil
+			}
+		} else if arg1 == "-a" {
+			if len(c.Args) >= 3 {
+				arg2 := c.Args[2]
+				historyFile, err := os.OpenFile(arg2, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+				if err != nil {
+					return err
+				}
+				defer historyFile.Close()
+				for _, history := range c.sh.appendHistoryList {
+					fmt.Fprintf(historyFile, "%s\n", history)
+				}
+				c.sh.appendHistoryList = nil
 				return nil
 			}
 		} else {
