@@ -9,10 +9,15 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/chzyer/readline"
 	"github.com/codecrafters-io/shell-starter-go/internal"
+)
+
+const (
+	prompt = "$ "
 )
 
 type Shell struct {
@@ -35,7 +40,7 @@ func NewShell() *Shell {
 func (sh *Shell) Run() {
 
 	rl, err := readline.NewEx(&readline.Config{
-		Prompt:       "$ ",
+		Prompt:       prompt,
 		HistoryFile:  "/tmp/my-shell.history",
 		AutoComplete: sh.completer,
 	})
@@ -163,6 +168,8 @@ func (sh *Shell) dumpHistory(path string) error {
 
 type myAutoCompleter struct {
 	trie *internal.Trie
+
+	tabPressed bool
 }
 
 func NewMyAutoCompleter() readline.AutoCompleter {
@@ -180,20 +187,42 @@ func NewMyAutoCompleter() readline.AutoCompleter {
 }
 
 func (m *myAutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int) {
-	prefix := string(line)
-
-	completion := m.trie.FindCompletion(prefix)
-
-	if completion == nil {
-		fmt.Fprintf(os.Stdout, "\x07")
+	strLine := string(line)
+	l := strings.Fields(strLine)
+	if len(l) == 0 {
 		return nil, 0
 	}
 
-	for i := range completion {
-		completion[i] = append(completion[i], ' ')
-	}
+	prefix := l[0]
+	completion := m.trie.FindCompletion(prefix)
 
-	return completion, len(prefix)
+	if len(completion) == 0 {
+		m.tabPressed = false
+		fmt.Fprintf(os.Stdout, "\x07")
+		return nil, 0
+	} else if len(completion) == 1 {
+		// 直接补全需要依赖readline
+		m.tabPressed = false
+		strCompletion0 := string(completion[0])
+		strCompletion0, _ = strings.CutPrefix(strCompletion0, prefix)
+		strCompletion0 += " "
+		return [][]rune{[]rune(strCompletion0)}, len(prefix)
+	} else if !m.tabPressed {
+		m.tabPressed = true
+		fmt.Fprintf(os.Stdout, "\x07")
+		return nil, 0
+	} else {
+		// 为了通过测试需要手动输出到stdout
+		m.tabPressed = false
+		strCompletion := make([]string, 0, len(completion))
+		for i := range completion {
+			strCompletion = append(strCompletion, string(completion[i]))
+		}
+		sort.Strings(strCompletion)
+		fmt.Fprintf(os.Stdout, "\n%s\n", strings.Join(strCompletion, "  "))
+		fmt.Fprintf(os.Stdout, "%s%s", prompt, strLine)
+		return nil, 0
+	}
 }
 
 func getExternCommand() []string {

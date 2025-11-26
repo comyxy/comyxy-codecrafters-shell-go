@@ -70,7 +70,7 @@ func (t *Trie) FindCompletion(prefix string) [][]rune {
 			traverse(nextTrie, ps+string(c))
 		}
 	}
-	traverse(node, "")
+	traverse(node, prefix)
 
 	return res
 }
