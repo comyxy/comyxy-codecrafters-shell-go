@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/chzyer/readline"
@@ -165,6 +167,11 @@ type myAutoCompleter struct {
 
 func NewMyAutoCompleter() readline.AutoCompleter {
 	trie := internal.NewTrie()
+
+	for _, cmd := range getExternCommand() {
+		trie.Insert(cmd)
+	}
+
 	trie.Insert("echo")
 	trie.Insert("exit")
 	return &myAutoCompleter{
@@ -187,4 +194,29 @@ func (m *myAutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int
 	}
 
 	return completion, len(prefix)
+}
+
+func getExternCommand() []string {
+	var cmds []string
+
+	path := os.Getenv("PATH")
+	for _, dir := range filepath.SplitList(path) {
+		if dir == "" {
+			// Unix shell semantics: path element "" means "."
+			dir = "."
+		}
+		_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+			if path == dir {
+				return nil
+			}
+
+			r, err := filepath.Rel(dir, path)
+			if err != nil {
+				return nil
+			}
+			cmds = append(cmds, r)
+			return nil
+		})
+	}
+	return cmds
 }
