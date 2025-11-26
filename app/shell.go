@@ -15,18 +15,29 @@ import (
 type Shell struct {
 	historyList       []string
 	appendHistoryList []string
+
+	completer *readline.PrefixCompleter
 }
 
 func NewShell() *Shell {
-	sh := &Shell{}
+	completer := readline.NewPrefixCompleter(
+		readline.PcItem("echo"),
+		readline.PcItem("exit"),
+	)
+
+	sh := &Shell{
+		completer: completer,
+	}
+
 	return sh
 }
 
 func (sh *Shell) Run() {
 
 	rl, err := readline.NewEx(&readline.Config{
-		Prompt:      "$ ",
-		HistoryFile: "/tmp/my-shell.history",
+		Prompt:       "$ ",
+		HistoryFile:  "/tmp/my-shell.history",
+		AutoComplete: sh.completer,
 	})
 	if err != nil {
 		log.Fatal(err)
