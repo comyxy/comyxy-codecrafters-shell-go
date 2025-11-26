@@ -10,20 +10,18 @@ import (
 	"strings"
 
 	"github.com/chzyer/readline"
+	"github.com/codecrafters-io/shell-starter-go/internal"
 )
 
 type Shell struct {
 	historyList       []string
 	appendHistoryList []string
 
-	completer *readline.PrefixCompleter
+	completer readline.AutoCompleter
 }
 
 func NewShell() *Shell {
-	completer := readline.NewPrefixCompleter(
-		readline.PcItem("echo"),
-		readline.PcItem("exit"),
-	)
+	completer := NewMyAutoCompleter()
 
 	sh := &Shell{
 		completer: completer,
@@ -159,4 +157,34 @@ func (sh *Shell) dumpHistory(path string) error {
 		fmt.Fprintf(historyFile, "%s\n", history)
 	}
 	return nil
+}
+
+type myAutoCompleter struct {
+	trie *internal.Trie
+}
+
+func NewMyAutoCompleter() readline.AutoCompleter {
+	trie := internal.NewTrie()
+	trie.Insert("echo")
+	trie.Insert("exit")
+	return &myAutoCompleter{
+		trie: trie,
+	}
+}
+
+func (m *myAutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int) {
+	prefix := string(line)
+
+	completion := m.trie.FindCompletion(prefix)
+
+	if completion == nil {
+		fmt.Fprintf(os.Stdout, "\x07")
+		return nil, 0
+	}
+
+	for i := range completion {
+		completion[i] = append(completion[i], ' ')
+	}
+
+	return completion, len(prefix)
 }
