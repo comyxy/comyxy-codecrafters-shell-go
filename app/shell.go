@@ -181,6 +181,13 @@ func NewMyAutoCompleter() readline.AutoCompleter {
 
 	trie.Insert("echo")
 	trie.Insert("exit")
+
+	//trie.Insert("xyz_ant")
+	//trie.Insert("xyz_ant_owl")
+	//trie.Insert("xyz_ant_owl_pig")
+
+	//trie.Print()
+
 	return &myAutoCompleter{
 		trie: trie,
 	}
@@ -203,26 +210,45 @@ func (m *myAutoCompleter) Do(line []rune, pos int) (newLine [][]rune, length int
 	} else if len(completion) == 1 {
 		// 直接补全需要依赖readline
 		m.tabPressed = false
-		strCompletion0 := string(completion[0])
+		strCompletion0 := completion[0]
 		strCompletion0, _ = strings.CutPrefix(strCompletion0, prefix)
 		strCompletion0 += " "
 		return [][]rune{[]rune(strCompletion0)}, len(prefix)
-	} else if !m.tabPressed {
-		m.tabPressed = true
-		fmt.Fprintf(os.Stdout, "\x07")
-		return nil, 0
 	} else {
-		// 为了通过测试需要手动输出到stdout
-		m.tabPressed = false
-		strCompletion := make([]string, 0, len(completion))
-		for i := range completion {
-			strCompletion = append(strCompletion, string(completion[i]))
+		sort.Slice(completion, func(i, j int) bool {
+			return len(completion[i]) < len(completion[j])
+		})
+		isChain := isCompletionPrefixChain(completion)
+		if isChain {
+			strCompletion0 := completion[0]
+			strCompletion0, _ = strings.CutPrefix(strCompletion0, prefix)
+			return [][]rune{[]rune(strCompletion0)}, len(prefix)
+		} else if !m.tabPressed {
+			m.tabPressed = true
+			fmt.Fprintf(os.Stdout, "\x07")
+			return nil, 0
+		} else {
+			// 为了通过测试需要手动输出到stdout
+			m.tabPressed = false
+			sort.Strings(completion)
+			fmt.Fprintf(os.Stdout, "\n%s\n", strings.Join(completion, "  "))
+			fmt.Fprintf(os.Stdout, "%s%s", prompt, strLine)
+			return nil, 0
 		}
-		sort.Strings(strCompletion)
-		fmt.Fprintf(os.Stdout, "\n%s\n", strings.Join(strCompletion, "  "))
-		fmt.Fprintf(os.Stdout, "%s%s", prompt, strLine)
-		return nil, 0
 	}
+}
+
+func isCompletionPrefixChain(strs []string) bool {
+	for i := 0; i < len(strs)-1; i++ {
+		cur := strs[i]
+		next := strs[i+1]
+
+		ok := strings.HasPrefix(next, cur)
+		if !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func getExternCommand() []string {

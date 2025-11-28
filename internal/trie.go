@@ -1,5 +1,7 @@
 package internal
 
+import "fmt"
+
 type Trie struct {
 	children map[rune]*Trie
 	isEnd    bool
@@ -49,13 +51,13 @@ func (t *Trie) walkTrie(prefix string) *Trie {
 	return node
 }
 
-func (t *Trie) FindCompletion(prefix string) [][]rune {
+func (t *Trie) FindCompletion(prefix string) []string {
 	node := t.walkTrie(prefix)
 	if node == nil {
 		return nil
 	}
 
-	res := make([][]rune, 0, len(node.children))
+	res := make([]string, 0, len(node.children))
 
 	var traverse func(node *Trie, ps string)
 	traverse = func(node *Trie, ps string) {
@@ -63,8 +65,7 @@ func (t *Trie) FindCompletion(prefix string) [][]rune {
 			return
 		}
 		if node.isEnd {
-			res = append(res, []rune(ps))
-			return
+			res = append(res, ps)
 		}
 		for c, nextTrie := range node.children {
 			traverse(nextTrie, ps+string(c))
@@ -73,4 +74,26 @@ func (t *Trie) FindCompletion(prefix string) [][]rune {
 	traverse(node, prefix)
 
 	return res
+}
+
+func (t *Trie) Print() {
+	res := make([]string, 0)
+
+	var traverse func(node *Trie, ps string)
+	traverse = func(node *Trie, ps string) {
+		if node == nil {
+			return
+		}
+		if node.isEnd {
+			res = append(res, ps)
+		}
+		for c, nextTrie := range node.children {
+			traverse(nextTrie, ps+string(c))
+		}
+	}
+
+	traverse(t, ``)
+	for _, v := range res {
+		fmt.Println(v)
+	}
 }
